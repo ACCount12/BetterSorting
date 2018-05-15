@@ -17,8 +17,6 @@ using HBS;
  * 9. Generic jump jets (2)
  * 10. Generic heat sinks (1)
  * 
- * I have no idea how to get mech tonnage on SalvageDefs, so those are not sorted by tonnage yet.
- * 
  */
 
 namespace BetterSorting
@@ -48,10 +46,15 @@ namespace BetterSorting
 
             switch (item.ComponentType)
             {
-                // No idea on how to sort by mech tonnage here.
-                // Feel free to help me out.
                 case ComponentType.MechPart:
                     __result = 100;
+
+                    DataManager dm = LazySingletonBehavior<UnityGameInstance>.Instance.Game.DataManager;
+                    if (dm.MechDefs.Exists(item.Description.Id))
+                    {
+                        MechDef mechDef = dm.MechDefs.Get(item.Description.Id);
+                        __result += (int)mechDef.Chassis.Tonnage;
+                    }
                     break;
 
                 case ComponentType.Upgrade:
@@ -96,7 +99,7 @@ namespace BetterSorting
 
         static void Postfix(ShopDefItem __instance, ref int __result)
         {
-            DataManager dataManager = LazySingletonBehavior<UnityGameInstance>.Instance.Game.DataManager;
+            DataManager dm = LazySingletonBehavior<UnityGameInstance>.Instance.Game.DataManager;
             ShopDefItem item = __instance;
             MechComponentDef ComponentDef = null;
             __result = 0;
@@ -104,28 +107,28 @@ namespace BetterSorting
             switch (item.Type)
             {
                 case ShopItemType.Upgrade:
-                    if (dataManager.UpgradeDefs.Exists(item.GUID))
-                        ComponentDef = dataManager.UpgradeDefs.Get(item.GUID);
+                    if (dm.UpgradeDefs.Exists(item.GUID))
+                        ComponentDef = dm.UpgradeDefs.Get(item.GUID);
                     break;
 
                 case ShopItemType.Weapon:
-                    if (dataManager.WeaponDefs.Exists(item.GUID))
-                        ComponentDef = dataManager.WeaponDefs.Get(item.GUID);
+                    if (dm.WeaponDefs.Exists(item.GUID))
+                        ComponentDef = dm.WeaponDefs.Get(item.GUID);
                     break;
 
                 case ShopItemType.AmmunitionBox:
-                    if (dataManager.AmmoBoxDefs.Exists(item.GUID))
-                        ComponentDef = dataManager.AmmoBoxDefs.Get(item.GUID);
+                    if (dm.AmmoBoxDefs.Exists(item.GUID))
+                        ComponentDef = dm.AmmoBoxDefs.Get(item.GUID);
                     break;
                         
                 case ShopItemType.JumpJet:
-                    if (dataManager.JumpJetDefs.Exists(item.GUID))
-                        ComponentDef = dataManager.JumpJetDefs.Get(item.GUID);
+                    if (dm.JumpJetDefs.Exists(item.GUID))
+                        ComponentDef = dm.JumpJetDefs.Get(item.GUID);
                     break;
 
                 case ShopItemType.HeatSink:
-                    if (dataManager.HeatSinkDefs.Exists(item.GUID))
-                        ComponentDef = dataManager.HeatSinkDefs.Get(item.GUID);
+                    if (dm.HeatSinkDefs.Exists(item.GUID))
+                        ComponentDef = dm.HeatSinkDefs.Get(item.GUID);
                     break;
             }
 
@@ -149,9 +152,9 @@ namespace BetterSorting
                         __result = 100;
 
                     string id = item.GUID.Replace("mechdef", "chassisdef");
-                    if (dataManager.ChassisDefs.Exists(id))
+                    if (dm.ChassisDefs.Exists(id))
                     {
-                        ChassisDef ChassisDef = dataManager.ChassisDefs.Get(id);
+                        ChassisDef ChassisDef = dm.ChassisDefs.Get(id);
                         if (ChassisDef != null)
                             __result += (int)ChassisDef.Tonnage;
                     }
