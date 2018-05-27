@@ -1,4 +1,4 @@
-# BetterSorting
+# Better Sorting
 A BattleTech mod that improves sorting on salvage selection screen, in shops and in mech lab. Requires BTML.
 
 ## Download
