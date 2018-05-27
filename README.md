@@ -23,6 +23,6 @@ This mod changes equipment sorting to prioritize what's important to most player
 Mech lab inventory is sorted by:
 
  1. Category 
- 2. Type.
+ 2. Type
  3. Manufacturer
  4. Rarity
