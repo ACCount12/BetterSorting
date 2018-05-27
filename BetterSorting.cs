@@ -124,6 +124,7 @@ namespace BetterSorting
                     if ((instruction.operand as MethodInfo)?.Name == "set_value")
                     {
                         instList[idx - 1].opcode = OpCodes.Ldc_I4_1;
+                        break;
                     }
                 }
             }
