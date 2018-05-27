@@ -3,6 +3,7 @@ using BattleTech.Data;
 using BattleTech.UI;
 using Harmony;
 using HBS;
+using HBS.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -102,91 +103,7 @@ namespace BetterSorting
 
         private static void Postfix(ShopDefItem __instance, ref int __result)
         {
-            DataManager dm = LazySingletonBehavior<UnityGameInstance>.Instance.Game.DataManager;
-            ShopDefItem item = __instance;
-            MechComponentDef ComponentDef = null;
-            __result = 0;
-
-            switch (item.Type)
-            {
-                case ShopItemType.Upgrade:
-                    if (dm.UpgradeDefs.Exists(item.GUID))
-                        ComponentDef = dm.UpgradeDefs.Get(item.GUID);
-                    break;
-
-                case ShopItemType.Weapon:
-                    if (dm.WeaponDefs.Exists(item.GUID))
-                        ComponentDef = dm.WeaponDefs.Get(item.GUID);
-                    break;
-
-                case ShopItemType.AmmunitionBox:
-                    if (dm.AmmoBoxDefs.Exists(item.GUID))
-                        ComponentDef = dm.AmmoBoxDefs.Get(item.GUID);
-                    break;
-
-                case ShopItemType.JumpJet:
-                    if (dm.JumpJetDefs.Exists(item.GUID))
-                        ComponentDef = dm.JumpJetDefs.Get(item.GUID);
-                    break;
-
-                case ShopItemType.HeatSink:
-                    if (dm.HeatSinkDefs.Exists(item.GUID))
-                        ComponentDef = dm.HeatSinkDefs.Get(item.GUID);
-                    break;
-            }
-
-            // LosTech > all
-            if (ComponentDef != null && ComponentDef.ComponentTags.Contains("component_type_lostech"))
-            {
-                __result = 500;
-                return;
-            }
-
-            switch (item.Type)
-            {
-                case ShopItemType.Mech:
-                case ShopItemType.MechPart:
-
-                    if (item.Type == ShopItemType.Mech)
-                        __result = 300;
-                    else
-                        __result = 100;
-
-                    string id = item.GUID.Replace("mechdef", "chassisdef");
-                    if (dm.ChassisDefs.Exists(id))
-                    {
-                        ChassisDef ChassisDef = dm.ChassisDefs.Get(id);
-                        if (ChassisDef != null)
-                            __result += (int)ChassisDef.Tonnage;
-                    }
-                    break;
-
-                case ShopItemType.Upgrade:
-                    __result = 9;
-                    break;
-
-                case ShopItemType.Weapon:
-                    if (ComponentDef != null && (!string.IsNullOrEmpty(ComponentDef.BonusValueA) || !string.IsNullOrEmpty(ComponentDef.BonusValueB)))
-                        __result = 5;
-                    else
-                        __result = 4;
-                    break;
-
-                case ShopItemType.AmmunitionBox:
-                    __result = 3;
-                    break;
-
-                case ShopItemType.JumpJet:
-                    __result = 2;
-                    break;
-
-                case ShopItemType.HeatSink:
-                    if (ComponentDef != null && ComponentDef.Description.Rarity > 0)
-                        __result = 8;
-                    else
-                        __result = 1;
-                    break;
-            }
+            __result = BetterSorting.GetShopDefSortVal(__instance);
         }
 
     }
@@ -225,11 +142,34 @@ namespace BetterSorting
                 int num = 0;
                 char[] trimChars = new char[] { '+', ' ' };
 
+                // check for shop first
+                ShopDefItem s1 = a?.controller?.shopDefItem;
+                ShopDefItem s2 = b?.controller?.shopDefItem;
+                if (s1 != null || s2 != null)
+                {
+                    //Log("comparing shop items...");
+                    if (s1 != null && s2 != null)
+                    {
+                        __result = BetterSorting.GetShopDefSortVal(s2).CompareTo(BetterSorting.GetShopDefSortVal(s1));
+                    }
+                    else if (s1 != null)
+                    {
+                        __result = -1;
+                    }
+                    else if (s2 != null)
+                    {
+                        __result = 1;
+                    }
+
+                    return false;
+                }
+
                 WeaponDef weaponDef = a?.controller?.weaponDef;
                 WeaponDef weaponDef2 = b?.controller?.weaponDef;
 
                 if (weaponDef != null && weaponDef2 != null)
                 {
+                    //Log("comparing two weapons");
                     // category (missile, ballistic...)
                     num = weaponDef.Category.CompareTo(weaponDef2.Category);
                     // sub-type (SRM,LRM...)
@@ -263,11 +203,13 @@ namespace BetterSorting
                 }
                 else if (a?.controller?.ammoBoxDef != null && b?.controller?.ammoBoxDef != null) // ammo
                 {
+                    //Log("comparing ammo");
                     // ammo type
                     num = a.controller.ammoBoxDef.Ammo.Category.CompareTo(b.controller.ammoBoxDef.Ammo.Category);
                 }
                 else if (a?.controller?.componentDef != null && b?.controller?.componentDef != null) // equipment
                 {
+                    //Log("comparing equipment");
                     // remove + from ui name and compare
                     num = a.controller.componentDef.Description.UIName.Trim(trimChars).CompareTo(b.controller.componentDef.Description.UIName.Trim(trimChars));
                     // rarity (descending)
@@ -278,16 +220,34 @@ namespace BetterSorting
                 }
                 else
                 {
-                    // general type
-                    num = a.ComponentRef.ComponentDefType.CompareTo(b.ComponentRef.ComponentDefType);
+                    //Log("comparing componentDef");
+                    MechComponentRef m1 = a?.ComponentRef;
+                    MechComponentRef m2 = b?.ComponentRef;
+                    if (m1 != null && m2 != null)
+                    {
+                        // general type
+                        num = a.ComponentRef.ComponentDefType.CompareTo(b.ComponentRef.ComponentDefType);
+                    }
+                    else if (m1 != null)
+                    {
+                        num = -1;
+                    }
+                    else if (m2 != null)
+                    {
+                        num = 1;
+                    }
+
                 }
 
                 __result = num;
                 return false;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return true;
+                BetterSorting.Log(e.ToString());
+                // fall back to original comparison (by name)
+                __result = Traverse.Create(__instance).Method("SortBy_Name", new Type[] { typeof(InventoryItemElement), typeof(InventoryItemElement) }, new InventoryItemElement[] { b, a }).GetValue<int>();
+                return false;
             }
         }
     }
@@ -298,6 +258,102 @@ namespace BetterSorting
         {
             var harmony = HarmonyInstance.Create("org.null.ACCount.BetterSorting");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
+        }
+
+        private static ILog m_log = HBS.Logging.Logger.GetLogger(typeof(BetterSorting).Name, LogLevel.Log);
+
+        public static void Log(string message)
+        {
+            m_log.Log(message);
+        }
+
+        public static int GetShopDefSortVal(ShopDefItem item)
+        {
+            DataManager dm = LazySingletonBehavior<UnityGameInstance>.Instance.Game.DataManager;
+            MechComponentDef ComponentDef = null;
+            int result = 0;
+
+            switch (item.Type)
+            {
+                case ShopItemType.Upgrade:
+                    if (dm.UpgradeDefs.Exists(item.GUID))
+                        ComponentDef = dm.UpgradeDefs.Get(item.GUID);
+                    break;
+
+                case ShopItemType.Weapon:
+                    if (dm.WeaponDefs.Exists(item.GUID))
+                        ComponentDef = dm.WeaponDefs.Get(item.GUID);
+                    break;
+
+                case ShopItemType.AmmunitionBox:
+                    if (dm.AmmoBoxDefs.Exists(item.GUID))
+                        ComponentDef = dm.AmmoBoxDefs.Get(item.GUID);
+                    break;
+
+                case ShopItemType.JumpJet:
+                    if (dm.JumpJetDefs.Exists(item.GUID))
+                        ComponentDef = dm.JumpJetDefs.Get(item.GUID);
+                    break;
+
+                case ShopItemType.HeatSink:
+                    if (dm.HeatSinkDefs.Exists(item.GUID))
+                        ComponentDef = dm.HeatSinkDefs.Get(item.GUID);
+                    break;
+            }
+
+            // LosTech > all
+            if (ComponentDef != null && ComponentDef.ComponentTags.Contains("component_type_lostech"))
+            {
+                return 500;
+            }
+
+            switch (item.Type)
+            {
+                case ShopItemType.Mech:
+                case ShopItemType.MechPart:
+
+                    if (item.Type == ShopItemType.Mech)
+                        result = 300;
+                    else
+                        result = 100;
+
+                    string id = item.GUID.Replace("mechdef", "chassisdef");
+                    if (dm.ChassisDefs.Exists(id))
+                    {
+                        ChassisDef ChassisDef = dm.ChassisDefs.Get(id);
+                        if (ChassisDef != null)
+                            result += (int)ChassisDef.Tonnage;
+                    }
+                    break;
+
+                case ShopItemType.Upgrade:
+                    result = 9;
+                    break;
+
+                case ShopItemType.Weapon:
+                    result = 4; //generic weapon
+                    if (ComponentDef != null)
+                    {
+                        result += ComponentDef.Description.UIName.Split('+').Length - 1; //add 1/2/3 for +/++/+++ weapons
+                    }
+                    break;
+
+                case ShopItemType.AmmunitionBox:
+                    result = 3;
+                    break;
+
+                case ShopItemType.JumpJet:
+                    result = 2;
+                    break;
+
+                case ShopItemType.HeatSink:
+                    if (ComponentDef != null && ComponentDef.Description.Rarity > 0)
+                        result = 8;
+                    else
+                        result = 1;
+                    break;
+            }
+            return result;
         }
     }
 }
