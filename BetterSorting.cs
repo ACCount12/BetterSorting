@@ -268,6 +268,86 @@ namespace BetterSorting
             m_log.Log(message);
         }
 
+        private enum SORT_TYPE
+        {
+            MECH_BAY,
+            SHOP,
+            SALVAGE
+        }
+
+        private static SORT_TYPE _currentSort;
+
+        /*
+* Sorting order: (priority)
+* 1. LosTech (500)
+* 2. Mechs (300 + tonnage)
+* 3. Mech parts (100 + tonnage)
+* 4. Upgrades (9)
+* 5. Rare "heat sinks": heat banks, etc (8)
+* 6. Improved weapons (5)
+* 7. Generic weapons (4)
+* 8. Generic ammo (3)
+* 9. Generic jump jets (2)
+* 10. Generic heat sinks (1)
+*
+*/
+
+        public static int GetSortVal(ListElementController_BASE item)
+        {
+            int num = 0;
+
+            // complete mechs
+            if (item.shopDefItem != null && item.shopDefItem.Type == ShopItemType.Mech)
+                return 200000 + (int)item?.chassisDef?.Tonnage;
+
+            // mech salvage
+            if (item.salvageDef != null && item.salvageDef.ComponentType == ComponentType.MechPart)
+                return 150000 + (int)item.salvageDef.MechComponentDef.Tonnage;
+
+            if (item?.componentDef != null)
+            {
+                // lostech
+                if (item.componentDef.ComponentTags.Contains("component_type_lostech"))
+                    return 250000;
+
+                // upgrades/equipment
+                if (item.componentDef.ComponentType == ComponentType.Upgrade)
+                    return 125000 + (int)item.componentDef.ComponentType * 10 + (int)item.componentDef.Description.Rarity;
+
+                // improved heatsink
+                if (item.shopDefItem != null && item.shopDefItem.Type == ShopItemType.HeatSink && item.componentDef.Description.Rarity > 0)
+                    num += 115000 + (int)item.componentDef.ComponentType * 10 + (int)item.componentDef.Description.Rarity;
+
+                // generic equipment
+
+
+            }
+
+            // weapons (10000 - ~50000)
+            WeaponDef wd = item?.weaponDef;
+            if (wd != null)
+            {
+                // category
+                num += (int)wd.Category * 10000;
+                // sub-type (SRM,LRM...)
+                num += (int)wd.WeaponSubType * 100;
+                // quality
+                int quality = wd.Description.UIName.Split('+').Length - 1;
+                num += quality;
+
+                if (_currentSort != SORT_TYPE.MECH_BAY && wd.Description.Rarity > 0)
+                {
+                    num *= 10;
+                }
+            }
+
+            // ammo
+            if (item.ammoBoxDef != null)
+                num += (int)item.ammoBoxDef.Ammo.Category;
+
+            return num;
+        }
+
         public static int GetShopDefSortVal(ShopDefItem item)
         {
             DataManager dm = LazySingletonBehavior<UnityGameInstance>.Instance.Game.DataManager;
